@@ -1,4 +1,5 @@
 import type { SensorData } from '../types';
+import { degreesToCompassNorwegian } from '../utils';
 
 interface Props {
   data: SensorData;
@@ -13,8 +14,8 @@ const METRIC_CONFIG: Record<string, { label: string; unit: string; icon: string 
   battery_percent: { label: 'Batteri', unit: '%', icon: '🔋' },
   windstrength: { label: 'Vind', unit: 'km/h', icon: '💨' },
   guststrength: { label: 'Vindkast', unit: 'km/h', icon: '🌬️' },
-  windangle: { label: 'Vindretning', unit: '°', icon: '🧭' },
-  gustangle: { label: 'Kast retning', unit: '°', icon: '🧭' },
+  windangle: { label: 'Vindretning', unit: '', icon: '🧭' },
+  gustangle: { label: 'Kast retning', unit: '', icon: '🧭' },
 };
 
 function getMetricType(key: string): string {
@@ -47,7 +48,9 @@ export default function MetricsPanel({ data }: Props) {
             : type === 'windstrength' || type === 'guststrength'
             ? `${Math.round(value * 10) / 10} ${config.unit}`
             : type === 'windangle' || type === 'gustangle'
-            ? `${Math.round(value)}${config.unit}`
+            ? typeof value === 'number' && !Number.isNaN(value)
+              ? `${degreesToCompassNorwegian(value)} (${Math.round(value)}°)`
+              : '—'
             : `${Math.round(value * 10) / 10} ${config.unit}`;
 
         return (
