@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { format, parseISO } from 'date-fns';
 import { nb } from 'date-fns/locale';
-import type { WeatherData, SensorName, TimeRange } from './types';
-import { getTemperatureKey } from './utils';
+import type { WeatherData, SensorName, TimeRange, TrendChartMetric } from './types';
+import { getAvailableTrendMetrics, getSensorMetricKey } from './utils';
 import SensorCard from './components/SensorCard';
 import TrendChart from './components/TrendChart';
 import StatsTable from './components/StatsTable';
@@ -25,6 +25,7 @@ export default function App() {
   const [data, setData] = useState<WeatherData | null>(null);
   const [selected, setSelected] = useState<SensorName>('ute');
   const [timeRange, setTimeRange] = useState<TimeRange>('24h');
+  const [trendMetric, setTrendMetric] = useState<TrendChartMetric>('temperature');
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -36,6 +37,31 @@ export default function App() {
       .then(setData)
       .catch((e) => setError(e.message));
   }, []);
+
+  const selectedSensor = data?.sensors[selected];
+
+  const availableTrendMetrics = useMemo(
+    () => getAvailableTrendMetrics(selected, selectedSensor),
+    [selected, selectedSensor],
+  );
+
+  const effectiveTrendMetric = useMemo((): TrendChartMetric => {
+    if (!data) return trendMetric;
+    const avail = getAvailableTrendMetrics(selected, data.sensors[selected]);
+    if (avail.length === 0) return 'temperature';
+    if (avail.includes(trendMetric)) return trendMetric;
+    return avail.includes('temperature') ? 'temperature' : avail[0]!;
+  }, [data, selected, trendMetric]);
+
+  const selectSensor = useCallback(
+    (sensor: SensorName) => {
+      setSelected(sensor);
+      if (!data) return;
+      const avail = getAvailableTrendMetrics(sensor, data.sensors[sensor]);
+      setTrendMetric(avail.includes('temperature') ? 'temperature' : (avail[0] ?? 'temperature'));
+    },
+    [data],
+  );
 
   if (error) {
     return (
@@ -53,9 +79,10 @@ export default function App() {
     );
   }
 
-  const selectedSensor = data.sensors[selected];
-  const tempKey = getTemperatureKey(selected);
-  const tempHistory = selectedSensor?.[tempKey]?.history ?? [];
+  const singleHistory =
+    effectiveTrendMetric === 'wind'
+      ? []
+      : (data.sensors[selected]?.[getSensorMetricKey(selected, effectiveTrendMetric)]?.history ?? []);
 
   const updatedStr = format(parseISO(data.updatedAt), "d. MMMM HH:mm", { locale: nb });
 
@@ -82,7 +109,7 @@ export default function App() {
                 name={sensor}
                 data={data.sensors[sensor]}
                 selected={selected === sensor}
-                onClick={() => setSelected(sensor)}
+                onClick={() => selectSensor(sensor)}
               />
             ))}
           </div>
@@ -95,12 +122,17 @@ export default function App() {
           </div>
           <div className="chart-card">
             <TrendChart
-              history={tempHistory}
+              sensor={selected}
+              sensorLabel={SENSOR_LABELS[selected]}
+              sensorData={data.sensors[selected]}
               timeRange={timeRange}
               onTimeRangeChange={setTimeRange}
-              sensorLabel={SENSOR_LABELS[selected]}
+              trendMetric={effectiveTrendMetric}
+              onTrendMetricChange={setTrendMetric}
+              availableTrendMetrics={availableTrendMetrics}
+              singleHistory={singleHistory}
             />
-            <MetricsPanel data={selectedSensor} />
+            <MetricsPanel data={data.sensors[selected]} />
           </div>
         </section>
 
