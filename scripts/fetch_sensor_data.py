@@ -8,10 +8,19 @@ Environment (Cognite — same pattern as cognite auth.py):
 Environment (GCS):
   GCS_BUCKET (default: rendalen-weather)
   GCS_OBJECT (default: rendalen/data.json)
-  GOOGLE_APPLICATION_CREDENTIALS — path to SA JSON locally, or use GCP_KEY in CI
+  RENDALEN_GCS_CREDENTIALS — preferred locally: absolute or ~/ path to the service account JSON
+    (e.g. ~/Downloads/andershaf-87-37b021043f82.json). Uses that file only for this upload, so a
+    wrong GOOGLE_APPLICATION_CREDENTIALS from another project does not break the run.
+  GOOGLE_APPLICATION_CREDENTIALS — used by google-cloud-storage if RENDALEN_GCS_CREDENTIALS is unset;
+    in CI use GCP_KEY via google-github-actions/auth instead.
 
-Optional:
-  RENDALEN_OUTPUT_LOCAL=1 — write ./data.json only, skip GCS (for dry runs without GCP auth)
+Environment (wind — Netatmo module slug in CDF, same as extractor external_id prefix):
+  RENDALEN_WIND_MODULE (default: smart_anemometer)
+    Fetches {module}_windstrength, _guststrength, _windangle, _gustangle and merges them into
+    sensors.ute in data.json (Hytta Vær shows them under Ute).
+
+Local output instead of GCS:
+  RENDALEN_OUTPUT_LOCAL=1 — write data only (default path ./data.json, override with RENDALEN_OUTPUT_PATH)
 """
 from __future__ import annotations
 
@@ -24,6 +33,18 @@ from cognite.client import CogniteClient, ClientConfig
 from cognite.client.credentials import OAuthClientCredentials
 from cognite.client.data_classes.data_modeling import NodeId
 
+SPACE = "nydalen"
+
+_WIND_SUFFIXES = ("windstrength", "guststrength", "windangle", "gustangle")
+
+
+def _wind_time_series_external_ids() -> list[str]:
+    raw = os.environ.get("RENDALEN_WIND_MODULE", "smart_anemometer")
+    mod = raw.strip().lower().replace(" ", "_") if raw else ""
+    if not mod:
+        mod = "smart_anemometer"
+    return [f"{mod}_{sfx}" for sfx in _WIND_SUFFIXES]
+
 
 SENSORS = {
     "stua": [
@@ -33,7 +54,12 @@ SENSORS = {
         "stua_noise",
         "stua_pressure",
     ],
-    "ute": ["ute_temperature", "ute_humidity", "ute_battery_percent"],
+    "ute": [
+        "ute_temperature",
+        "ute_humidity",
+        "ute_battery_percent",
+        *_wind_time_series_external_ids(),
+    ],
     "kjøkkenet": [
         "kjøkkenet_temperature",
         "kjøkkenet_humidity",
@@ -41,7 +67,6 @@ SENSORS = {
         "kjøkkenet_co2",
     ],
 }
-SPACE = "nydalen"
 
 
 def create_cognite_client() -> CogniteClient:
@@ -153,7 +178,15 @@ def upload_gcs(payload: dict, bucket: str, object_name: str) -> None:
     from google.cloud import storage
 
     body = json.dumps(payload, indent=2).encode("utf-8")
-    client = storage.Client()
+    cred_path = os.environ.get("RENDALEN_GCS_CREDENTIALS", "").strip()
+    if cred_path:
+        cred_path = os.path.expanduser(cred_path)
+        if not os.path.isfile(cred_path):
+            print(f"RENDALEN_GCS_CREDENTIALS not found: {cred_path}", file=sys.stderr)
+            sys.exit(1)
+        client = storage.Client.from_service_account_json(cred_path)
+    else:
+        client = storage.Client()
     blob = client.bucket(bucket).blob(object_name)
     blob.cache_control = "public, max-age=300"
     blob.upload_from_string(body, content_type="application/json; charset=utf-8")
