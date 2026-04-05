@@ -15,6 +15,12 @@ const SENSOR_LABELS: Record<SensorName, string> = {
   stua: 'Stua',
 };
 
+const baseUrl = import.meta.env.BASE_URL.endsWith('/')
+  ? import.meta.env.BASE_URL
+  : `${import.meta.env.BASE_URL}/`;
+const DATA_JSON_URL =
+  import.meta.env.VITE_DATA_JSON_URL || `${baseUrl}data.json`;
+
 export default function App() {
   const [data, setData] = useState<WeatherData | null>(null);
   const [selected, setSelected] = useState<SensorName>('ute');
@@ -22,7 +28,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch('./data.json')
+    fetch(DATA_JSON_URL)
       .then((r) => {
         if (!r.ok) throw new Error('Kunne ikke laste data');
         return r.json();

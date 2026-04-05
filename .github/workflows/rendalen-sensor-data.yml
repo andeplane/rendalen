@@ -1,0 +1,45 @@
+name: Rendalen sensor data to GCS
+
+on:
+  schedule:
+    - cron: "0 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rendalen-gcs
+  cancel-in-progress: true
+
+jobs:
+  fetch-and-upload:
+    runs-on: ubuntu-latest
+    env:
+      CDF_PROJECT: andershaf
+      CDF_CLUSTER: api
+      GCS_BUCKET: rendalen-weather
+      GCS_OBJECT: rendalen/data.json
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_KEY }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r scripts/requirements.txt
+
+      - name: Fetch from CDF and upload to GCS
+        env:
+          ANDERSHAF_TENANTID: ${{ secrets.ANDERSHAF_TENANTID }}
+          ANDERSHAF_CLIENTID: ${{ secrets.ANDERSHAF_CLIENTID }}
+          ANDERSHAF_CLIENTSECRET: ${{ secrets.ANDERSHAF_CLIENTSECRET }}
+        run: python scripts/fetch_sensor_data.py
