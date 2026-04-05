@@ -37,3 +37,12 @@ export function formatTemp(value: number): string {
 export function getTemperatureKey(sensorName: string): string {
   return `${sensorName}_temperature`;
 }
+
+/** Meteorological degrees clockwise from north (0° = N, 90° = Ø). */
+const COMPASS_NB = ['N', 'NØ', 'Ø', 'SØ', 'S', 'SV', 'V', 'NV'] as const;
+
+export function degreesToCompassNorwegian(deg: number): string {
+  const n = ((deg % 360) + 360) % 360;
+  const idx = Math.floor((n + 22.5) / 45) % 8;
+  return COMPASS_NB[idx];
+}
