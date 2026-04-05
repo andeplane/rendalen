@@ -74,15 +74,62 @@ export function getWindAngleKey(sensor: SensorName): string {
   return `${sensor}_windangle`;
 }
 
+const WIND_STRENGTH_SUFFIX = '_windstrength';
+
+/** Resolved keys for a module-style external id (e.g. smart_anemometer_windstrength). */
+export interface ResolvedWindKeys {
+  strength: string;
+  gust: string;
+  angle: string;
+}
+
+/**
+ * Find wind time series on this sensor: any `*_windstrength` key (CDF external id prefix + suffix).
+ * Picks the first key alphabetically if several exist. Falls back to `{sensor}_windstrength` when present.
+ */
+export function resolveWindSeriesKeys(sensor: SensorName, data: SensorData | undefined): ResolvedWindKeys | null {
+  if (!data) return null;
+  const candidates = Object.keys(data)
+    .filter((k) => k.endsWith(WIND_STRENGTH_SUFFIX) && data[k] != null)
+    .sort();
+  const strengthKey = candidates[0];
+  if (strengthKey) {
+    const base = strengthKey.slice(0, -WIND_STRENGTH_SUFFIX.length);
+    return {
+      strength: strengthKey,
+      gust: `${base}_guststrength`,
+      angle: `${base}_windangle`,
+    };
+  }
+  const legacy = getWindStrengthKey(sensor);
+  if (data[legacy]) {
+    return {
+      strength: legacy,
+      gust: getWindGustKey(sensor),
+      angle: getWindAngleKey(sensor),
+    };
+  }
+  return null;
+}
+
 function hasHistory(sensor: SensorData | undefined, key: string): boolean {
   const h = sensor?.[key]?.history;
   return Array.isArray(h) && h.length > 0;
 }
 
+function hasFiniteLatest(sensor: SensorData | undefined, key: string): boolean {
+  const v = sensor?.[key]?.latest;
+  return typeof v === 'number' && !Number.isNaN(v);
+}
+
 export function getAvailableTrendMetrics(sensor: SensorName, data: SensorData | undefined): TrendChartMetric[] {
   if (!data) return [];
   return TREND_METRIC_ORDER.filter((m) => {
-    if (m === 'wind') return hasHistory(data, getWindStrengthKey(sensor));
+    if (m === 'wind') {
+      const wk = resolveWindSeriesKeys(sensor, data);
+      if (!wk) return false;
+      return hasHistory(data, wk.strength) || hasFiniteLatest(data, wk.strength);
+    }
     return hasHistory(data, getSensorMetricKey(sensor, m));
   });
 }
@@ -92,9 +139,11 @@ export function getAvailableTrendMetrics(sensor: SensorName, data: SensorData | 
  */
 export function buildWindChartRows(sensor: SensorName, data: SensorData | undefined, range: TimeRange): WindChartRow[] {
   if (!data) return [];
-  const wKey = getWindStrengthKey(sensor);
-  const gKey = getWindGustKey(sensor);
-  const aKey = getWindAngleKey(sensor);
+  const keys = resolveWindSeriesKeys(sensor, data);
+  if (!keys) return [];
+  const wKey = keys.strength;
+  const gKey = keys.gust;
+  const aKey = keys.angle;
   const windHist = filterByTimeRange(data[wKey]?.history ?? [], range);
   if (windHist.length === 0) return [];
   const gustHist = filterByTimeRange(data[gKey]?.history ?? [], range);
