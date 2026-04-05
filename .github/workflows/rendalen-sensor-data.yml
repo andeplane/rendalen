@@ -2,7 +2,8 @@ name: Rendalen sensor data to GCS
 
 on:
   schedule:
-    - cron: "0 * * * *"
+    # Every 5 minutes (UTC). GitHub may delay runs slightly under load.
+    - cron: "*/5 * * * *"
   workflow_dispatch:
 
 permissions:
