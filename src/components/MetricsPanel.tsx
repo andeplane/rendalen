@@ -11,6 +11,10 @@ const METRIC_CONFIG: Record<string, { label: string; unit: string; icon: string 
   noise: { label: 'Støy', unit: 'dB', icon: '🔊' },
   pressure: { label: 'Lufttrykk', unit: 'hPa', icon: '🌀' },
   battery_percent: { label: 'Batteri', unit: '%', icon: '🔋' },
+  windstrength: { label: 'Vind', unit: 'km/h', icon: '💨' },
+  guststrength: { label: 'Vindkast', unit: 'km/h', icon: '🌬️' },
+  windangle: { label: 'Vindretning', unit: '°', icon: '🧭' },
+  gustangle: { label: 'Kast retning', unit: '°', icon: '🧭' },
 };
 
 function getMetricType(key: string): string {
@@ -40,6 +44,10 @@ export default function MetricsPanel({ data }: Props) {
             ? `${Math.round(value)} ${config.unit}`
             : type === 'pressure'
             ? `${Math.round(value)} ${config.unit}`
+            : type === 'windstrength' || type === 'guststrength'
+            ? `${Math.round(value * 10) / 10} ${config.unit}`
+            : type === 'windangle' || type === 'gustangle'
+            ? `${Math.round(value)}${config.unit}`
             : `${Math.round(value * 10) / 10} ${config.unit}`;
 
         return (
