@@ -9,6 +9,12 @@ lerna-debug.log*
 
 node_modules
 dist
+
+# Fetched locally before dev; do not commit
+public/data.json
+
+# Local pipeline output (e.g. fetch_sensor_data.py RENDALEN_OUTPUT_LOCAL)
+/data.json
 dist-ssr
 tmp
 *.local

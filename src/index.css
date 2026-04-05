@@ -213,6 +213,30 @@ body {
   color: white;
 }
 
+.trend-chart__metric-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.trend-chart__metric-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.trend-chart__empty {
+  min-height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  color: var(--text-muted);
+  padding: 16px;
+}
+
 /* Metrics panel */
 .metrics-panel {
   display: flex;
