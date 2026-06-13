@@ -1,0 +1,30 @@
+name: Keepalive
+
+on:
+  schedule:
+    - cron: "0 6 1 * *" # 1st of every month at 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Update keepalive timestamp
+        run: |
+          date -u > last-keepalive.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add last-keepalive.txt
+          git commit -m "chore: keepalive [skip ci]"
+          git push
+
+      - name: Re-enable sensor workflow
+        run: gh workflow enable rendalen-sensor-data.yml
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
