@@ -114,9 +114,13 @@ def latest_measurement(datapoint) -> tuple[float | None, str | None]:
         value = value[-1] if value else None
     if isinstance(timestamp, (list, tuple)):
         timestamp = timestamp[-1] if timestamp else None
-    if value is None or not isinstance(timestamp, (int, float)):
+    if value is None:
         return None, None
-    return value, datetime.fromtimestamp(timestamp / 1000.0, tz=timezone.utc).isoformat()
+    if isinstance(timestamp, datetime):
+        return value, timestamp.astimezone(timezone.utc).isoformat()
+    if isinstance(timestamp, (int, float)):
+        return value, datetime.fromtimestamp(timestamp / 1000.0, tz=timezone.utc).isoformat()
+    return None, None
 
 
 def build_payload(client: CogniteClient) -> dict:
