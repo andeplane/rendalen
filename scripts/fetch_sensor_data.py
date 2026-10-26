@@ -106,6 +106,19 @@ def create_cognite_client() -> CogniteClient:
     return CogniteClient(config)
 
 
+def latest_measurement(datapoint) -> tuple[float | None, str | None]:
+    """SDK 7 returns a Datapoints list; SDK 8 returns a scalar LatestDatapoint."""
+    value = getattr(datapoint, "value", None)
+    timestamp = getattr(datapoint, "timestamp", None)
+    if isinstance(value, (list, tuple)):
+        value = value[-1] if value else None
+    if isinstance(timestamp, (list, tuple)):
+        timestamp = timestamp[-1] if timestamp else None
+    if value is None or not isinstance(timestamp, (int, float)):
+        return None, None
+    return value, datetime.fromtimestamp(timestamp / 1000.0, tz=timezone.utc).isoformat()
+
+
 def build_payload(client: CogniteClient) -> dict:
     timeseries_node_ids: list[NodeId] = []
     for ts_list in SENSORS.values():
@@ -153,11 +166,7 @@ def build_payload(client: CogniteClient) -> dict:
                     break
 
             latest_dp = latest_by_id.get(target)
-            latest_value = latest_dp.value[-1] if latest_dp is not None and len(latest_dp) else None
-            latest_at = (
-                datetime.fromtimestamp(latest_dp.timestamp[-1] / 1000.0, tz=timezone.utc).isoformat()
-                if latest_dp is not None and len(latest_dp) else None
-            )
+            latest_value, latest_at = latest_measurement(latest_dp)
             if dp and len(dp) > 0:
                 history = []
                 for p in dp:
