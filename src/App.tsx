@@ -1,6 +1,6 @@
+import { currentValue } from './freshness';
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { format, parseISO } from 'date-fns';
-import { nb } from 'date-fns/locale';
+import { parseISO } from 'date-fns';
 import type { WeatherData, SensorName, TimeRange, TrendChartMetric } from './types';
 import { getAvailableTrendMetrics, getSensorMetricKey } from './utils';
 import SensorCard from './components/SensorCard';
@@ -26,16 +26,27 @@ export default function App() {
   const [selected, setSelected] = useState<SensorName>('ute');
   const [timeRange, setTimeRange] = useState<TimeRange>('24h');
   const [trendMetric, setTrendMetric] = useState<TrendChartMetric>('temperature');
+  const [now, setNow] = useState(Date.now);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch(DATA_JSON_URL)
-      .then((r) => {
-        if (!r.ok) throw new Error('Kunne ikke laste data');
-        return r.json();
-      })
-      .then(setData)
-      .catch((e) => setError(e.message));
+    const controller = new AbortController();
+    const load = async () => {
+      try {
+        const response = await fetch(DATA_JSON_URL, { cache: 'no-store', signal: controller.signal });
+        if (!response.ok) throw new Error('Kunne ikke laste data');
+        const next = await response.json() as WeatherData;
+        if (!next.sensors || !next.updatedAt) throw new Error('Ugyldige sensordata');
+        setData(next);
+        setError(null);
+      } catch (e) {
+        if (!controller.signal.aborted) setError(e instanceof Error ? e.message : 'Kunne ikke laste data');
+      }
+    };
+    void load();
+    const refresh = setInterval(() => { void load(); }, 5 * 60 * 1000);
+    const tick = setInterval(() => setNow(Date.now()), 60 * 1000);
+    return () => { controller.abort(); clearInterval(refresh); clearInterval(tick); };
   }, []);
 
   const selectedSensor = data?.sensors[selected];
@@ -63,7 +74,7 @@ export default function App() {
     [data],
   );
 
-  if (error) {
+  if (error && !data) {
     return (
       <div className="app">
         <div className="error-state">⚠️ {error}</div>
@@ -84,7 +95,12 @@ export default function App() {
       ? []
       : (data.sensors[selected]?.[getSensorMetricKey(selected, effectiveTrendMetric)]?.history ?? []);
 
-  const updatedStr = format(parseISO(data.updatedAt), "d. MMMM HH:mm", { locale: nb });
+  const parsedSync = parseISO(data.updatedAt);
+  const updatedStr = Number.isFinite(parsedSync.getTime())
+    ? new Intl.DateTimeFormat('nb-NO', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Oslo' }).format(parsedSync)
+    : 'ukjent tidspunkt';
+  const stale = Object.values(data.sensors).some((sensor) =>
+    Object.values(sensor).some((metric) => currentValue(metric, now) === null));
 
   return (
     <div className="app">
@@ -93,9 +109,14 @@ export default function App() {
           <div className="header__icon">🏡</div>
           <div className="header__text">
             <h1 className="header__title">Hytta Vær</h1>
-            <p className="header__sub">Rendalen · Oppdatert {updatedStr}</p>
+            <p className="header__sub">Rendalen · Sist synkronisert {updatedStr}</p>
           </div>
         </header>
+
+        {(stale || error) && <p className="freshness-notice" role="status">
+          {error ? 'Kunne ikke synkronisere på nytt. ' : ''}
+          Målinger eldre enn 30 minutter skjules. Se «Sist målt» ved hver måling.
+        </p>}
 
         <section>
           <div className="section-header">
