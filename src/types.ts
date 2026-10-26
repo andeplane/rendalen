@@ -4,7 +4,8 @@ export interface DataPoint {
 }
 
 export interface Metric {
-  latest: number;
+  latest: number | null;
+  latestAt?: string | null;
   history: DataPoint[];
 }
 

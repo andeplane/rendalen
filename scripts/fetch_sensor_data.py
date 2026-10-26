@@ -122,6 +122,11 @@ def build_payload(client: CogniteClient) -> dict:
         ignore_unknown_ids=True,
     )
     print(f"Fetched datapoints for {len(dp_list)} time series.")
+    latest_points = client.time_series.data.retrieve_latest(
+        instance_id=timeseries_node_ids, ignore_unknown_ids=True,
+    )
+    latest_by_id = {dp.instance_id: dp for dp in latest_points}
+
 
     result = {
         "updatedAt": datetime.now(timezone.utc).isoformat(),
@@ -147,6 +152,12 @@ def build_payload(client: CogniteClient) -> dict:
                     dp = d
                     break
 
+            latest_dp = latest_by_id.get(target)
+            latest_value = latest_dp.value[-1] if latest_dp is not None and len(latest_dp) else None
+            latest_at = (
+                datetime.fromtimestamp(latest_dp.timestamp[-1] / 1000.0, tz=timezone.utc).isoformat()
+                if latest_dp is not None and len(latest_dp) else None
+            )
             if dp and len(dp) > 0:
                 history = []
                 for p in dp:
@@ -160,14 +171,15 @@ def build_payload(client: CogniteClient) -> dict:
                                 "value": val,
                             }
                         )
-                latest = history[-1]["value"] if history else None
                 result["sensors"][asset][ts_ext_id] = {
-                    "latest": latest,
+                    "latest": latest_value,
+                    "latestAt": latest_at,
                     "history": history,
                 }
             else:
                 result["sensors"][asset][ts_ext_id] = {
-                    "latest": None,
+                    "latest": latest_value,
+                    "latestAt": latest_at,
                     "history": [],
                 }
 

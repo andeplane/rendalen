@@ -356,3 +356,8 @@ body {
     font-size: 22px;
   }
 }
+
+.sensor-card__sync, .metric-chip__sync { font-size: 10px; line-height: 1.4; color: var(--text-secondary); margin-top: 6px; }
+.sensor-card__stale, .metric-chip__stale { font-size: 11px; color: #8b4a1c; margin-top: 4px; }
+.metric-chip__sync, .metric-chip__stale { display: block; }
+.freshness-notice { font-size: 12px; line-height: 1.5; padding: 12px; background: #fff3df; border: 1px solid #e4c99e; border-radius: var(--radius-sm); color: #704414; }

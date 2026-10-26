@@ -1,3 +1,4 @@
+import { currentValue, measurementLabel } from '../freshness';
 import type { SensorData } from '../types';
 import { degreesToCompassNorwegian } from '../utils';
 
@@ -35,8 +36,8 @@ export default function MetricsPanel({ data }: Props) {
         const config = METRIC_CONFIG[type];
         if (!config) return null;
 
-        const value = metric.latest;
-        const displayValue =
+        const value = currentValue(metric);
+        const displayValue = value === null ? '—' :
           type === 'temperature'
             ? `${Math.round(value * 10) / 10}${config.unit}`
             : type === 'humidity' || type === 'battery_percent'
@@ -59,6 +60,8 @@ export default function MetricsPanel({ data }: Props) {
             <div className="metric-chip__content">
               <span className="metric-chip__label">{config.label}</span>
               <span className="metric-chip__value">{displayValue}</span>
+              {value === null && <span className="metric-chip__stale">Ingen ferske målinger</span>}
+              <span className="metric-chip__sync">{measurementLabel(metric)}</span>
             </div>
           </div>
         );

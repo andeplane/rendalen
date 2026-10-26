@@ -24,9 +24,10 @@ export function filterByTimeRange(history: DataPoint[], range: TimeRange): DataP
       cutoff = subMonths(now, 1);
       break;
   }
-  const filtered = history.filter((d) => parseISO(d.timestamp) >= cutoff);
-  // If no data in range, return all available data
-  return filtered.length > 0 ? filtered : history;
+  return history.filter((d) => {
+    const time = parseISO(d.timestamp);
+    return time >= cutoff && time <= now;
+  });
 }
 
 export function getMin(data: DataPoint[]): DataPoint | null {
